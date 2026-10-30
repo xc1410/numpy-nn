@@ -26,3 +26,15 @@ def forward(images,weight1,bias1,weight2,bias2):
     probs=softmax(logits)
     return pre_relu,hidden,probs
 
+def backward(images,labels,weight2,pre_relu,hidden,probs):
+    count=len(labels)
+    onehot=np.zeros(probs.shape)
+    onehot[np.arange(count),labels]=1
+    grad_logits=(probs-onehot)/count
+    grad_weight2=hidden.T@grad_logits
+    grad_bias2=grad_logits.sum(axis=0)
+    grad_hidden=grad_logits@weight2.T
+    grad_pre_relu=grad_hidden*(pre_relu>0)
+    grad_weight1=images.T@grad_pre_relu
+    grad_bias1=grad_pre_relu.sum(axis=0)
+    return grad_weight1, grad_bias1, grad_weight2, grad_bias2
