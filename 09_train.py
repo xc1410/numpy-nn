@@ -43,3 +43,19 @@ for epoch in range(epochs):
 
 print(time.perf_counter() - begin)
 assert accuracy >= 0.96, accuracy
+
+
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(9, 3.5))
+plt.subplot(1, 2, 1)
+plt.plot(range(1, epochs + 1), losses, marker="o")
+plt.xlabel("epoch")
+plt.ylabel("train loss")
+plt.subplot(1, 2, 2)
+plt.plot(range(1, epochs + 1), accuracies, marker="o")
+plt.xlabel("epoch")
+plt.ylabel("test accuracy")
+plt.tight_layout()
+plt.savefig("curves.png")
+print("saved curves.png")
