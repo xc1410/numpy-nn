@@ -11,7 +11,7 @@ train_images, train_labels, test_images, test_labels = load_mnist()
 test_images_t = torch.tensor(test_images, dtype=torch.float32)
 test_labels_t = torch.tensor(test_labels, dtype=torch.int64)
 
-seed = 0
+
 lr = 0.5
 batch_size = 100
 epochs = 10
