@@ -83,3 +83,14 @@ grad_logits 应除以样本数 100，实际除以了类别数 10 → 更新一�
 图片按打乱后的 batch 索引读取，标签却仍按连续区间切片 → loss 长期停在约 2.30，准确率只有 0.1028，最终断言失败 → 对照图片和标签的取样语句，可以定位到两者索引不一致。
 
 数组形状虽然匹配，训练样本的对应关系已经错位。修正时应让图片和标签共用同一组索引。接近随机猜测的结果值得检查数据配对，但仅凭准确率，还不能确定模型是否始终预测同一类别。
+
+## PyTorch 替我做掉了什么
+
+| PyTorch | numpy 版里对应的（文件、哪几行） | 我怎么验证的（文件、结果） |
+|---|---|---|
+| `nn.Linear` | `model.py` 第 23、25 行的 `images@weight1+bias1`、`hidden@weight2+bias2`，参数也由它自己存。numpy 版权重存成（输入，输出），PyTorch 存成（输出，输入），计算时转置 | `14`：`layer(images_t)` 和手写的 `images_t @ layer.weight.T + layer.bias` 比较，打出 True |
+| `F.cross_entropy` | `model.py` 第 3–10 行的 `softmax` 和 `cross_entropy`：减最大值、exp、归一化、按标签取概率、取 log、求平均 | `13`：loss 是 `1.0987214335908604`，和 numpy 版一样 |
+| `loss_t.backward()` | `model.py` 的 `backward`，第 33–39 行，7 行手推的梯度 | `13`：四个梯度和 numpy 版比较，四个 True |
+| `optimizer.step()` | `09` 第 32–35 行，`weight1 = weight1 - lr * grad_weight1` 那四行 | `15`：前三步 loss 和 numpy 版一样；`16`：十个 epoch 的准确率和 `09` 逐位一样 |
+| `optimizer.zero_grad()` | numpy 版没有对应的行：`backward` 每次返回新算的梯度。autograd 是把梯度累加到 `.grad` 上，所以每步要先清零 | `15` 里去掉它：第三步 loss 变成 `1.0540`，不是 `1.0664` |
+| `DataLoader(shuffle=True)` | `09` 第 21 行每个 epoch 开头的 `np.random.permutation`，加上按 batch 切片 | `17`：打乱两次，五个标签都在、图和标签没拆开；`18`（`shuffle=False`）：十个 epoch 的准确率和 numpy 算出的期待逐位一样 |
