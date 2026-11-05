@@ -94,3 +94,15 @@ grad_logits 应除以样本数 100，实际除以了类别数 10 → 更新一�
 | `optimizer.step()` | `09` 第 32–35 行，`weight1 = weight1 - lr * grad_weight1` 那四行 | `15`：前三步 loss 和 numpy 版一样；`16`：十个 epoch 的准确率和 `09` 逐位一样 |
 | `optimizer.zero_grad()` | numpy 版没有对应的行：`backward` 每次返回新算的梯度。autograd 是把梯度累加到 `.grad` 上，所以每步要先清零 | `15` 里去掉它：第三步 loss 变成 `1.0540`，不是 `1.0664` |
 | `DataLoader(shuffle=True)` | `09` 第 21 行每个 epoch 开头的 `np.random.permutation`，加上按 batch 切片 | `17`：打乱两次，五个标签都在、图和标签没拆开；`18`（`shuffle=False`）：十个 epoch 的准确率和 numpy 算出的期待逐位一样 |
+
+## 性能
+
+`21_gpu_train.py`：两层网络 784-128-10，float32，batch 100，学习率 0.5，10 个 epoch，`DataLoader(shuffle=True)`。耗时从第一个 epoch 开始，到第十个 epoch 结束（含每个 epoch 末尾测一次测试集）；吞吐 = 60000 × 10 ÷ 耗时；显存峰值是 `torch.cuda.max_memory_allocated()`。服务器：RTX 3090 只用一张，torch 2.14.1+cu130；服务器 CPU 限 8 个线程（`OMP_NUM_THREADS=8`）。
+
+| 设备 | 三次耗时（秒） | 吞吐（张/秒，三次平均） | 显存峰值（MiB） | 最后一个 epoch 的准确率（三次） |
+|---|---|---|---|---|
+| 笔记本 CPU | 7.70、8.40、7.81 | 75402 | 0 | 0.9796、0.9789、0.9801 |
+| 服务器 CPU（8 线程） | 9.27、9.16、9.27 | 65009 | 0 | 0.9782、0.9787、0.9755 |
+| 服务器 GPU（RTX 3090） | 9.31、8.95、9.30 | 65350 | 57.17 | 0.9779、0.9801、0.9788 |
+
+服务器 GPU 平均 9.18 秒，服务器 CPU 平均 9.23 秒，GPU 几乎没有更快（约 1.0 倍）；笔记本 CPU 反而最快。猜：这个模型很小，一步的矩阵乘法只有 (100, 784) @ (784, 128)，GPU、CPU 都很快算完；时间主要花在两边都要做的 CPU 工作上：`DataLoader` 一张一张取图再拼成 batch、Python 逐条发命令、每步 `.item()`。笔记本比服务器 CPU 快，猜是笔记本单核频率更高，而这些工作主要靠单核。待 Block 6 测"只取数据不训练"的时间来验证。
